@@ -1,0 +1,19 @@
+body { overflow: auto; }
+.form { max-width: 720px; padding: 10px 24px 30px; }
+h2 { font-weight: 500; margin: 8px 0 14px; }
+.drivers { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 12px; }
+.drivers button { padding: 8px 14px; }
+.drivers button.sel { background: var(--vscode-button-background); color: var(--vscode-button-foreground); }
+fieldset { border: 1px solid var(--border); border-radius: 4px; margin: 0 0 12px; padding: 8px 12px 10px; }
+legend { color: var(--muted); padding: 0 4px; }
+.row { display: flex; align-items: center; gap: 8px; margin: 5px 0; }
+.row > label:first-child { width: 120px; flex-shrink: 0; color: var(--muted); }
+.row input:not([type=checkbox]), .row select { flex: 1; }
+.row input.port { flex: 0 0 90px; }
+label.short { color: var(--muted); }
+label.chk { display: flex; align-items: center; gap: 6px; cursor: pointer; }
+.hint { color: var(--muted); font-size: 0.9em; }
+.actions { display: flex; gap: 8px; margin-top: 14px; }
+.result { padding: 8px 10px; border-radius: 3px; white-space: pre-wrap; margin-top: 8px; font-family: var(--vscode-editor-font-family, monospace); }
+.result.ok { background: rgba(80, 200, 120, 0.15); border: 1px solid rgba(80, 200, 120, 0.5); }
+.result.err { background: var(--vscode-inputValidation-errorBackground, rgba(240, 80, 80, 0.15)); border: 1px solid var(--vscode-inputValidation-errorBorder, #be1100); }

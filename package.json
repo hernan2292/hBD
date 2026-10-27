@@ -1,0 +1,321 @@
+{
+  "name": "hbd",
+  "displayName": "hBD - Cliente de Bases de Datos",
+  "description": "Cliente universal de bases de datos para VS Code inspirado en DBeaver: PostgreSQL, MySQL, MariaDB, SQL Server y SQLite. Explorador, editor SQL, grilla editable, ER, import/export, historial y túneles SSH.",
+  "version": "0.1.0",
+  "publisher": "hernanh",
+  "license": "GPL-3.0-only",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/hernan2292/hBD.git"
+  },
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other",
+    "Data Science",
+    "Programming Languages"
+  ],
+  "keywords": [
+    "database",
+    "sql",
+    "postgres",
+    "mysql",
+    "mariadb",
+    "sqlserver",
+    "sqlite",
+    "dbeaver"
+  ],
+  "main": "./out/extension.js",
+  "activationEvents": [
+    "onLanguage:sql"
+  ],
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "hbd",
+          "title": "hBD",
+          "icon": "media/hbd.svg"
+        }
+      ],
+      "panel": [
+        {
+          "id": "hbdPanel",
+          "title": "hBD Resultados",
+          "icon": "media/hbd.svg"
+        }
+      ]
+    },
+    "views": {
+      "hbd": [
+        {
+          "id": "hbd.connections",
+          "name": "Conexiones"
+        },
+        {
+          "id": "hbd.history",
+          "name": "Historial de consultas"
+        }
+      ],
+      "hbdPanel": [
+        {
+          "type": "webview",
+          "id": "hbd.results",
+          "name": "Resultados"
+        }
+      ]
+    },
+    "viewsWelcome": [
+      {
+        "view": "hbd.connections",
+        "contents": "No hay conexiones configuradas.\n[Nueva conexión](command:hbd.addConnection)\n[Importar conexiones](command:hbd.importConnections)"
+      }
+    ],
+    "commands": [
+      { "command": "hbd.addConnection", "title": "Nueva conexión", "category": "hBD", "icon": "$(add)" },
+      { "command": "hbd.editConnection", "title": "Editar conexión", "category": "hBD", "icon": "$(edit)" },
+      { "command": "hbd.deleteConnection", "title": "Eliminar conexión", "category": "hBD" },
+      { "command": "hbd.duplicateConnection", "title": "Duplicar conexión", "category": "hBD" },
+      { "command": "hbd.connect", "title": "Conectar", "category": "hBD", "icon": "$(plug)" },
+      { "command": "hbd.disconnect", "title": "Desconectar", "category": "hBD", "icon": "$(debug-disconnect)" },
+      { "command": "hbd.disconnectAll", "title": "Desconectar todo", "category": "hBD", "icon": "$(debug-disconnect)" },
+      { "command": "hbd.refresh", "title": "Refrescar", "category": "hBD", "icon": "$(refresh)" },
+      { "command": "hbd.refreshAll", "title": "Refrescar todo", "category": "hBD", "icon": "$(refresh)" },
+      { "command": "hbd.filterObjects", "title": "Filtrar objetos...", "category": "hBD", "icon": "$(filter)" },
+      { "command": "hbd.searchObjects", "title": "Buscar objetos en la base de datos...", "category": "hBD", "icon": "$(search)" },
+      { "command": "hbd.exportConnections", "title": "Exportar conexiones...", "category": "hBD" },
+      { "command": "hbd.importConnections", "title": "Importar conexiones...", "category": "hBD" },
+      { "command": "hbd.newSqlEditor", "title": "Nuevo editor SQL", "category": "hBD", "icon": "$(file-code)" },
+      { "command": "hbd.selectConnection", "title": "Seleccionar conexión activa del editor", "category": "hBD", "icon": "$(database)" },
+      { "command": "hbd.runStatement", "title": "Ejecutar sentencia actual", "category": "hBD", "icon": "$(play)" },
+      { "command": "hbd.runScript", "title": "Ejecutar script", "category": "hBD", "icon": "$(run-all)" },
+      { "command": "hbd.runStatementAt", "title": "Ejecutar sentencia", "category": "hBD" },
+      { "command": "hbd.explain", "title": "Plan de ejecución (EXPLAIN)", "category": "hBD", "icon": "$(type-hierarchy)" },
+      { "command": "hbd.formatSql", "title": "Formatear SQL", "category": "hBD" },
+      { "command": "hbd.toggleAutoCommit", "title": "Alternar auto-commit / transacción manual", "category": "hBD" },
+      { "command": "hbd.commit", "title": "Commit", "category": "hBD", "icon": "$(check)" },
+      { "command": "hbd.rollback", "title": "Rollback", "category": "hBD", "icon": "$(discard)" },
+      { "command": "hbd.openTableData", "title": "Ver datos", "category": "hBD", "icon": "$(table)" },
+      { "command": "hbd.openTableProperties", "title": "Ver propiedades", "category": "hBD", "icon": "$(info)" },
+      { "command": "hbd.showDDL", "title": "Ver DDL", "category": "hBD", "icon": "$(code)" },
+      { "command": "hbd.generateSelect", "title": "Generar SQL: SELECT", "category": "hBD" },
+      { "command": "hbd.generateInsert", "title": "Generar SQL: INSERT", "category": "hBD" },
+      { "command": "hbd.generateUpdate", "title": "Generar SQL: UPDATE", "category": "hBD" },
+      { "command": "hbd.generateDelete", "title": "Generar SQL: DELETE", "category": "hBD" },
+      { "command": "hbd.countRows", "title": "Contar filas", "category": "hBD" },
+      { "command": "hbd.truncateTable", "title": "Vaciar tabla (TRUNCATE)", "category": "hBD" },
+      { "command": "hbd.dropObject", "title": "Eliminar objeto (DROP)", "category": "hBD" },
+      { "command": "hbd.exportTable", "title": "Exportar datos...", "category": "hBD", "icon": "$(export)" },
+      { "command": "hbd.importCsv", "title": "Importar datos desde CSV...", "category": "hBD" },
+      { "command": "hbd.erDiagram", "title": "Diagrama ER", "category": "hBD", "icon": "$(type-hierarchy-sub)" },
+      { "command": "hbd.dumpDatabase", "title": "Generar dump SQL (estructura + datos)...", "category": "hBD" },
+      { "command": "hbd.copyName", "title": "Copiar nombre", "category": "hBD" },
+      { "command": "hbd.createDatabase", "title": "Crear base de datos...", "category": "hBD" },
+      { "command": "hbd.createSchema", "title": "Crear esquema...", "category": "hBD" },
+      { "command": "hbd.newTableTemplate", "title": "Nueva tabla (plantilla SQL)", "category": "hBD" },
+      { "command": "hbd.showSessions", "title": "Gestor de sesiones", "category": "hBD" },
+      { "command": "hbd.serverInfo", "title": "Información del servidor", "category": "hBD" },
+      { "command": "hbd.history.open", "title": "Abrir en editor SQL", "category": "hBD", "icon": "$(go-to-file)" },
+      { "command": "hbd.history.run", "title": "Ejecutar de nuevo", "category": "hBD", "icon": "$(play)" },
+      { "command": "hbd.history.copy", "title": "Copiar SQL", "category": "hBD", "icon": "$(copy)" },
+      { "command": "hbd.history.delete", "title": "Eliminar del historial", "category": "hBD" },
+      { "command": "hbd.history.clear", "title": "Limpiar historial", "category": "hBD", "icon": "$(clear-all)" },
+      { "command": "hbd.showLog", "title": "Mostrar log de ejecución", "category": "hBD", "icon": "$(output)" }
+    ],
+    "menus": {
+      "commandPalette": [
+        { "command": "hbd.runStatementAt", "when": "false" },
+        { "command": "hbd.editConnection", "when": "false" },
+        { "command": "hbd.deleteConnection", "when": "false" },
+        { "command": "hbd.duplicateConnection", "when": "false" },
+        { "command": "hbd.openTableData", "when": "false" },
+        { "command": "hbd.openTableProperties", "when": "false" },
+        { "command": "hbd.showDDL", "when": "false" },
+        { "command": "hbd.generateSelect", "when": "false" },
+        { "command": "hbd.generateInsert", "when": "false" },
+        { "command": "hbd.generateUpdate", "when": "false" },
+        { "command": "hbd.generateDelete", "when": "false" },
+        { "command": "hbd.countRows", "when": "false" },
+        { "command": "hbd.truncateTable", "when": "false" },
+        { "command": "hbd.dropObject", "when": "false" },
+        { "command": "hbd.exportTable", "when": "false" },
+        { "command": "hbd.importCsv", "when": "false" },
+        { "command": "hbd.copyName", "when": "false" },
+        { "command": "hbd.createSchema", "when": "false" },
+        { "command": "hbd.newTableTemplate", "when": "false" },
+        { "command": "hbd.refresh", "when": "false" },
+        { "command": "hbd.history.open", "when": "false" },
+        { "command": "hbd.history.run", "when": "false" },
+        { "command": "hbd.history.copy", "when": "false" },
+        { "command": "hbd.history.delete", "when": "false" }
+      ],
+      "view/title": [
+        { "command": "hbd.addConnection", "when": "view == hbd.connections", "group": "navigation@1" },
+        { "command": "hbd.newSqlEditor", "when": "view == hbd.connections", "group": "navigation@2" },
+        { "command": "hbd.searchObjects", "when": "view == hbd.connections", "group": "navigation@3" },
+        { "command": "hbd.refreshAll", "when": "view == hbd.connections", "group": "navigation@4" },
+        { "command": "hbd.disconnectAll", "when": "view == hbd.connections", "group": "navigation@5" },
+        { "command": "hbd.importConnections", "when": "view == hbd.connections", "group": "z_io@1" },
+        { "command": "hbd.exportConnections", "when": "view == hbd.connections", "group": "z_io@2" },
+        { "command": "hbd.showLog", "when": "view == hbd.connections", "group": "z_io@3" },
+        { "command": "hbd.history.clear", "when": "view == hbd.history", "group": "navigation" }
+      ],
+      "view/item/context": [
+        { "command": "hbd.connect", "when": "view == hbd.connections && viewItem == connection:disconnected", "group": "inline@1" },
+        { "command": "hbd.disconnect", "when": "view == hbd.connections && viewItem == connection:connected", "group": "inline@1" },
+        { "command": "hbd.newSqlEditor", "when": "view == hbd.connections && viewItem =~ /^(connection|database|schema)/", "group": "inline@2" },
+        { "command": "hbd.openTableData", "when": "view == hbd.connections && viewItem =~ /^object:(table|view|matview)$/", "group": "inline@1" },
+
+        { "command": "hbd.connect", "when": "view == hbd.connections && viewItem == connection:disconnected", "group": "1_conn@1" },
+        { "command": "hbd.disconnect", "when": "view == hbd.connections && viewItem == connection:connected", "group": "1_conn@1" },
+        { "command": "hbd.newSqlEditor", "when": "view == hbd.connections && viewItem =~ /^(connection|database|schema)/", "group": "1_conn@2" },
+        { "command": "hbd.editConnection", "when": "view == hbd.connections && viewItem =~ /^connection/", "group": "2_edit@1" },
+        { "command": "hbd.duplicateConnection", "when": "view == hbd.connections && viewItem =~ /^connection/", "group": "2_edit@2" },
+        { "command": "hbd.deleteConnection", "when": "view == hbd.connections && viewItem =~ /^connection/", "group": "2_edit@3" },
+        { "command": "hbd.searchObjects", "when": "view == hbd.connections && viewItem == connection:connected", "group": "3_tools@1" },
+        { "command": "hbd.filterObjects", "when": "view == hbd.connections && viewItem == connection:connected", "group": "3_tools@2" },
+        { "command": "hbd.showSessions", "when": "view == hbd.connections && viewItem == connection:connected", "group": "3_tools@3" },
+        { "command": "hbd.serverInfo", "when": "view == hbd.connections && viewItem == connection:connected", "group": "3_tools@4" },
+        { "command": "hbd.createDatabase", "when": "view == hbd.connections && viewItem == connection:connected", "group": "4_create@1" },
+
+        { "command": "hbd.createSchema", "when": "view == hbd.connections && viewItem == database", "group": "4_create@1" },
+        { "command": "hbd.newTableTemplate", "when": "view == hbd.connections && viewItem =~ /^(database|schema|folder:table)$/", "group": "4_create@2" },
+        { "command": "hbd.erDiagram", "when": "view == hbd.connections && viewItem =~ /^(database|schema)$/", "group": "5_tools@1" },
+        { "command": "hbd.dumpDatabase", "when": "view == hbd.connections && viewItem =~ /^(database|schema)$/", "group": "5_tools@2" },
+        { "command": "hbd.dropObject", "when": "view == hbd.connections && viewItem =~ /^(database|schema)$/", "group": "9_danger@1" },
+
+        { "command": "hbd.openTableData", "when": "view == hbd.connections && viewItem =~ /^object:(table|view|matview)$/", "group": "1_open@1" },
+        { "command": "hbd.openTableProperties", "when": "view == hbd.connections && viewItem =~ /^object:(table|view|matview)$/", "group": "1_open@2" },
+        { "command": "hbd.showDDL", "when": "view == hbd.connections && viewItem =~ /^object:/", "group": "1_open@3" },
+        { "command": "hbd.erDiagram", "when": "view == hbd.connections && viewItem == object:table", "group": "1_open@4" },
+        { "command": "hbd.generateSelect", "when": "view == hbd.connections && viewItem =~ /^object:(table|view|matview)$/", "group": "2_gen@1" },
+        { "command": "hbd.generateInsert", "when": "view == hbd.connections && viewItem == object:table", "group": "2_gen@2" },
+        { "command": "hbd.generateUpdate", "when": "view == hbd.connections && viewItem == object:table", "group": "2_gen@3" },
+        { "command": "hbd.generateDelete", "when": "view == hbd.connections && viewItem == object:table", "group": "2_gen@4" },
+        { "command": "hbd.countRows", "when": "view == hbd.connections && viewItem =~ /^object:(table|view|matview)$/", "group": "3_data@1" },
+        { "command": "hbd.exportTable", "when": "view == hbd.connections && viewItem =~ /^object:(table|view|matview)$/", "group": "3_data@2" },
+        { "command": "hbd.importCsv", "when": "view == hbd.connections && viewItem == object:table", "group": "3_data@3" },
+        { "command": "hbd.copyName", "when": "view == hbd.connections && viewItem =~ /^(object:|column|database|schema)/", "group": "4_copy@1" },
+        { "command": "hbd.truncateTable", "when": "view == hbd.connections && viewItem == object:table", "group": "9_danger@1" },
+        { "command": "hbd.dropObject", "when": "view == hbd.connections && viewItem =~ /^object:/", "group": "9_danger@2" },
+
+        { "command": "hbd.refresh", "when": "view == hbd.connections && viewItem != group", "group": "8_refresh@1" },
+
+        { "command": "hbd.history.run", "when": "view == hbd.history && viewItem == history", "group": "inline@1" },
+        { "command": "hbd.history.open", "when": "view == hbd.history && viewItem == history", "group": "inline@2" },
+        { "command": "hbd.history.open", "when": "view == hbd.history && viewItem == history", "group": "1@1" },
+        { "command": "hbd.history.run", "when": "view == hbd.history && viewItem == history", "group": "1@2" },
+        { "command": "hbd.history.copy", "when": "view == hbd.history && viewItem == history", "group": "1@3" },
+        { "command": "hbd.history.delete", "when": "view == hbd.history && viewItem == history", "group": "2@1" }
+      ],
+      "editor/title": [
+        { "command": "hbd.runStatement", "when": "editorLangId == sql", "group": "navigation@1" },
+        { "command": "hbd.runScript", "when": "editorLangId == sql", "group": "navigation@2" },
+        { "command": "hbd.explain", "when": "editorLangId == sql", "group": "navigation@3" },
+        { "command": "hbd.selectConnection", "when": "editorLangId == sql", "group": "navigation@4" }
+      ],
+      "editor/context": [
+        { "command": "hbd.runStatement", "when": "editorLangId == sql", "group": "hbd@1" },
+        { "command": "hbd.runScript", "when": "editorLangId == sql", "group": "hbd@2" },
+        { "command": "hbd.explain", "when": "editorLangId == sql", "group": "hbd@3" },
+        { "command": "hbd.formatSql", "when": "editorLangId == sql", "group": "hbd@4" },
+        { "command": "hbd.selectConnection", "when": "editorLangId == sql", "group": "hbd@5" }
+      ]
+    },
+    "keybindings": [
+      { "command": "hbd.runStatement", "key": "ctrl+enter", "mac": "cmd+enter", "when": "editorTextFocus && editorLangId == sql" },
+      { "command": "hbd.runScript", "key": "alt+x", "when": "editorTextFocus && editorLangId == sql" },
+      { "command": "hbd.explain", "key": "ctrl+shift+e", "mac": "cmd+shift+e", "when": "editorTextFocus && editorLangId == sql" },
+      { "command": "hbd.formatSql", "key": "ctrl+shift+f", "mac": "cmd+shift+f", "when": "editorTextFocus && editorLangId == sql" },
+      { "command": "hbd.newSqlEditor", "key": "ctrl+]", "mac": "cmd+]", "when": "focusedView == hbd.connections" }
+    ],
+    "configuration": {
+      "title": "hBD",
+      "properties": {
+        "hbd.maxRows": {
+          "type": "number",
+          "default": 1000,
+          "minimum": 1,
+          "description": "Máximo de filas que se muestran por resultado en el editor SQL."
+        },
+        "hbd.tableEditor.pageSize": {
+          "type": "number",
+          "default": 200,
+          "minimum": 1,
+          "description": "Filas por página en el editor de datos de tablas."
+        },
+        "hbd.showAllDatabases": {
+          "type": "boolean",
+          "default": true,
+          "description": "Mostrar todas las bases de datos del servidor (si es falso solo se muestra la base configurada en la conexión)."
+        },
+        "hbd.script.stopOnError": {
+          "type": "boolean",
+          "default": true,
+          "description": "Detener la ejecución de un script al primer error."
+        },
+        "hbd.blankLineDelimiter": {
+          "type": "boolean",
+          "default": true,
+          "description": "Tratar las líneas en blanco como delimitador de sentencias (modo 'smart' de DBeaver)."
+        },
+        "hbd.history.maxEntries": {
+          "type": "number",
+          "default": 500,
+          "description": "Cantidad máxima de consultas guardadas en el historial."
+        },
+        "hbd.codeLens.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Mostrar el botón '▶ Ejecutar' sobre cada sentencia del editor SQL."
+        },
+        "hbd.confirmDangerous": {
+          "type": "boolean",
+          "default": true,
+          "description": "Pedir confirmación antes de ejecutar DROP, TRUNCATE o UPDATE/DELETE sin WHERE."
+        },
+        "hbd.parameters.enabled": {
+          "type": "boolean",
+          "default": true,
+          "description": "Detectar parámetros :nombre y ${variable} y solicitar sus valores antes de ejecutar."
+        },
+        "hbd.format.keywordCase": {
+          "type": "string",
+          "enum": ["upper", "lower", "preserve"],
+          "default": "upper",
+          "description": "Capitalización de palabras clave al formatear SQL."
+        },
+        "hbd.format.tabWidth": {
+          "type": "number",
+          "default": 2,
+          "description": "Indentación al formatear SQL."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./",
+    "vscode:prepublish": "npm run compile",
+    "package": "npx --yes @vscode/vsce package"
+  },
+  "dependencies": {
+    "mssql": "^11.0.1",
+    "mysql2": "^3.11.5",
+    "pg": "^8.13.1",
+    "sql-formatter": "^15.4.6",
+    "sql.js": "^1.12.0",
+    "ssh2": "^1.16.0"
+  },
+  "devDependencies": {
+    "@types/mssql": "^9.1.5",
+    "@types/node": "^20.17.0",
+    "@types/pg": "^8.11.10",
+    "@types/sql.js": "^1.4.9",
+    "@types/ssh2": "^1.15.1",
+    "@types/vscode": "^1.90.0",
+    "typescript": "^5.6.3"
+  }
+}
