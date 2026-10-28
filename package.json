@@ -3,7 +3,7 @@
   "displayName": "hBD - Cliente de Bases de Datos",
   "description": "Cliente universal de bases de datos para VS Code inspirado en DBeaver: PostgreSQL, MySQL, MariaDB, SQL Server y SQLite. Explorador, editor SQL, grilla editable, ER, import/export, historial y túneles SSH.",
   "version": "0.1.0",
-  "publisher": "hernanh",
+  "publisher": "HernanHerrera",
   "license": "GPL-3.0-only",
   "repository": {
     "type": "git",
