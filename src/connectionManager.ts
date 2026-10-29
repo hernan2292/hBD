@@ -1,9 +1,22 @@
+import * as fs from 'fs';
 import * as vscode from 'vscode';
 import { BaseDriver, createDriver } from './drivers';
 import { openSshTunnel, SshTunnel } from './drivers/sshTunnel';
 import { ConnectionConfig } from './drivers/types';
 
-const STATE_KEY = 'hbd.connections';
+/** Lista de conexiones (se sincroniza entre equipos si hbd.syncConnections está activo). */
+export const STATE_KEY = 'hbd.connections';
+/** Rutas propias de este equipo (archivo SQLite, clave SSH); nunca se sincroniza. */
+const LOCAL_KEY = 'hbd.localOverrides';
+
+interface LocalOverride {
+  filePath?: string;
+  privateKeyPath?: string;
+}
+
+export function syncEnabled(): boolean {
+  return vscode.workspace.getConfiguration('hbd').get<boolean>('syncConnections', true);
+}
 
 export class ConnectionManager implements vscode.Disposable {
   private configs: ConnectionConfig[];
@@ -18,15 +31,60 @@ export class ConnectionManager implements vscode.Disposable {
   readonly onDidChangeTx = this._onDidChangeTx.event;
 
   constructor(private readonly ctx: vscode.ExtensionContext, private readonly log: vscode.OutputChannel) {
-    this.configs = ctx.globalState.get<ConnectionConfig[]>(STATE_KEY, []);
+    this.configs = this.load();
+  }
+
+  private load(): ConnectionConfig[] {
+    return this.ctx.globalState.get<ConnectionConfig[]>(STATE_KEY, []);
+  }
+
+  /**
+   * Recarga la lista si cambió desde otro equipo (Sincronización de configuración).
+   * Devuelve true si hubo cambios.
+   */
+  async reloadIfChanged(): Promise<boolean> {
+    const fresh = this.load();
+    if (JSON.stringify(fresh) === JSON.stringify(this.configs)) return false;
+    const removed = this.configs.filter(c => !fresh.some(f => f.id === c.id));
+    this.configs = fresh;
+    for (const c of removed) {
+      if (this.drivers.has(c.id)) await this.disconnect(c.id);
+      await this.ctx.secrets.delete(`hbd.pwd.${c.id}`);
+      await this.ctx.secrets.delete(`hbd.ssh.${c.id}`);
+    }
+    this.log.appendLine(`[${new Date().toLocaleTimeString()}] Conexiones actualizadas desde la sincronización`);
+    this._onDidChange.fire(undefined);
+    return true;
+  }
+
+  private overrides(): Record<string, LocalOverride> {
+    return this.ctx.globalState.get<Record<string, LocalOverride>>(LOCAL_KEY, {});
+  }
+
+  private async setOverride(id: string, o: LocalOverride | undefined): Promise<void> {
+    const all = { ...this.overrides() };
+    if (o && (o.filePath !== undefined || o.privateKeyPath !== undefined)) all[id] = o; else delete all[id];
+    await this.ctx.globalState.update(LOCAL_KEY, all);
+  }
+
+  /** Aplica las rutas locales de este equipo sobre la configuración sincronizada. */
+  private effective(c: ConnectionConfig): ConnectionConfig {
+    const o = this.overrides()[c.id];
+    if (!o) return c;
+    return {
+      ...c,
+      filePath: o.filePath ?? c.filePath,
+      ssh: c.ssh ? { ...c.ssh, privateKeyPath: o.privateKeyPath ?? c.ssh.privateKeyPath } : c.ssh
+    };
   }
 
   list(): ConnectionConfig[] {
-    return [...this.configs].sort((a, b) => a.name.localeCompare(b.name));
+    return this.configs.map(c => this.effective(c)).sort((a, b) => a.name.localeCompare(b.name));
   }
 
   get(id: string): ConnectionConfig | undefined {
-    return this.configs.find(c => c.id === id);
+    const c = this.configs.find(x => x.id === id);
+    return c && this.effective(c);
   }
 
   newId(): string {
@@ -46,9 +104,25 @@ export class ConnectionManager implements vscode.Disposable {
    * Guarda una conexión. password / sshSecret: undefined = no cambiar, string = nuevo valor.
    */
   async save(config: ConnectionConfig, password?: string, sshSecret?: string): Promise<void> {
+    await this.reloadIfChanged();
     const idx = this.configs.findIndex(c => c.id === config.id);
     const wasConnected = this.drivers.has(config.id);
-    if (idx >= 0) this.configs[idx] = config; else this.configs.push(config);
+    const stored = idx >= 0 ? this.configs[idx] : undefined;
+    let toStore = config;
+    if (stored && syncEnabled()) {
+      // Las rutas que difieren de las sincronizadas se guardan solo para este equipo
+      const o: LocalOverride = {};
+      if (config.filePath !== stored.filePath) { o.filePath = config.filePath; toStore = { ...toStore, filePath: stored.filePath }; }
+      const key = config.ssh?.privateKeyPath, storedKey = stored.ssh?.privateKeyPath;
+      if (config.ssh && stored.ssh && key !== storedKey) {
+        o.privateKeyPath = key;
+        toStore = { ...toStore, ssh: { ...config.ssh, privateKeyPath: storedKey } };
+      }
+      await this.setOverride(config.id, o);
+    } else {
+      await this.setOverride(config.id, undefined);
+    }
+    if (idx >= 0) this.configs[idx] = toStore; else this.configs.push(toStore);
     if (password !== undefined) {
       if (config.savePassword) await this.ctx.secrets.store(`hbd.pwd.${config.id}`, password);
       else this.sessionPasswords.set(config.id, password);
@@ -64,9 +138,11 @@ export class ConnectionManager implements vscode.Disposable {
 
   async remove(id: string): Promise<void> {
     await this.disconnect(id);
+    await this.reloadIfChanged();
     this.configs = this.configs.filter(c => c.id !== id);
     await this.ctx.secrets.delete(`hbd.pwd.${id}`);
     await this.ctx.secrets.delete(`hbd.ssh.${id}`);
+    await this.setOverride(id, undefined);
     await this.persist();
   }
 
@@ -81,10 +157,30 @@ export class ConnectionManager implements vscode.Disposable {
   }
 
   async importConfigs(list: ConnectionConfig[]): Promise<number> {
+    return this.importItems(list.filter(c => c && c.name && c.driver).map(c => ({ config: c })));
+  }
+
+  /** ¿Ya existe una conexión importada desde este origen? */
+  hasSource(sourceId: string): boolean {
+    return this.configs.some(c => c.sourceId === sourceId);
+  }
+
+  /** Importa conexiones con sus credenciales opcionales (que van al almacenamiento seguro). */
+  async importItems(items: { config: Omit<ConnectionConfig, 'id'> & { id?: string }; password?: string; sshSecret?: string }[]): Promise<number> {
+    await this.reloadIfChanged();
     let n = 0;
-    for (const c of list) {
-      if (!c || !c.name || !c.driver) continue;
-      this.configs.push({ ...c, id: this.newId() });
+    for (const it of items) {
+      const id = this.newId() + n;
+      const config: ConnectionConfig = { ...it.config, id };
+      this.configs.push(config);
+      if (it.password !== undefined) {
+        if (config.savePassword) await this.ctx.secrets.store(`hbd.pwd.${id}`, it.password);
+        else this.sessionPasswords.set(id, it.password);
+      }
+      if (it.sshSecret !== undefined) {
+        if (config.savePassword) await this.ctx.secrets.store(`hbd.ssh.${id}`, it.sshSecret);
+        else this.sessionPasswords.set(`ssh:${id}`, it.sshSecret);
+      }
       n++;
     }
     await this.persist();
@@ -104,6 +200,48 @@ export class ConnectionManager implements vscode.Disposable {
     return [...this.drivers.keys()].filter(id => this.isConnected(id));
   }
 
+  /**
+   * Las rutas (archivo SQLite, clave SSH) pueden no existir en este equipo si la conexión
+   * llegó por sincronización: se ofrece buscarlas y se guardan solo para este equipo.
+   */
+  private async checkLocalPaths(config: ConnectionConfig): Promise<ConnectionConfig> {
+    const ask = async (what: string, file: string, create: boolean): Promise<string | undefined> => {
+      const buttons = create ? ['Buscar archivo…', 'Crear base vacía'] : ['Buscar archivo…'];
+      const choice = await vscode.window.showWarningMessage(
+        `${what} de la conexión "${config.name}" no existe en este equipo:\n${file}`, { modal: true }, ...buttons);
+      if (choice === 'Crear base vacía') return file;
+      if (choice !== 'Buscar archivo…') throw new Error('Conexión cancelada.');
+      const pick = await vscode.window.showOpenDialog({ canSelectMany: false, openLabel: 'Usar este archivo' });
+      if (!pick?.[0]) throw new Error('Conexión cancelada.');
+      return pick[0].fsPath;
+    };
+    const o: LocalOverride = { ...this.overrides()[config.id] };
+    let changed = false;
+    if (config.driver === 'sqlite' && config.filePath && !fs.existsSync(config.filePath)) {
+      const p = await ask('El archivo SQLite', config.filePath, true);
+      if (p !== config.filePath) { o.filePath = p; changed = true; }
+    }
+    const key = config.ssh?.enabled && config.ssh.authType === 'key' ? config.ssh.privateKeyPath : undefined;
+    if (key && config.driver !== 'sqlite' && !fs.existsSync(key)) {
+      o.privateKeyPath = await ask('La clave privada SSH', key, false);
+      changed = true;
+    }
+    if (!changed) return config;
+    if (syncEnabled()) {
+      await this.setOverride(config.id, o);
+    } else {
+      const idx = this.configs.findIndex(c => c.id === config.id);
+      const c = this.configs[idx];
+      this.configs[idx] = {
+        ...c,
+        filePath: o.filePath ?? c.filePath,
+        ssh: c.ssh ? { ...c.ssh, privateKeyPath: o.privateKeyPath ?? c.ssh.privateKeyPath } : c.ssh
+      };
+      await this.persist();
+    }
+    return this.get(config.id)!;
+  }
+
   /** Devuelve el driver de la conexión, conectando si hace falta. */
   async getDriver(id: string): Promise<BaseDriver> {
     const existing = this.drivers.get(id);
@@ -118,8 +256,9 @@ export class ConnectionManager implements vscode.Disposable {
   }
 
   private async doConnect(id: string): Promise<BaseDriver> {
-    const config = this.get(id);
+    let config = this.get(id);
     if (!config) throw new Error('La conexión no existe.');
+    config = await this.checkLocalPaths(config);
     const password = await this.resolvePassword(config);
     const sshSecret = await this.resolveSshSecret(config);
     return vscode.window.withProgress(

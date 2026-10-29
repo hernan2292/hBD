@@ -12,7 +12,8 @@ export interface HistoryEntry {
   error?: string;
 }
 
-const KEY = 'hbd.history';
+export const HISTORY_KEY = 'hbd.history';
+const KEY = HISTORY_KEY;
 
 export class HistoryItem extends vscode.TreeItem {
   constructor(readonly entry: HistoryEntry) {
@@ -48,7 +49,16 @@ export class QueryHistory implements vscode.TreeDataProvider<HistoryItem> {
     return this.entries.map(e => new HistoryItem(e));
   }
 
+  /** Relee el historial (puede haber cambiado por la sincronización entre equipos). */
+  reload(): void {
+    const fresh = this.ctx.globalState.get<HistoryEntry[]>(KEY, []);
+    if (fresh.length === this.entries.length && fresh[0]?.id === this.entries[0]?.id) return;
+    this.entries = fresh;
+    this._onDidChange.fire();
+  }
+
   async add(e: Omit<HistoryEntry, 'id' | 'time'>): Promise<void> {
+    this.entries = this.ctx.globalState.get<HistoryEntry[]>(KEY, this.entries);
     const max = vscode.workspace.getConfiguration('hbd').get<number>('history.maxEntries', 500);
     const entry: HistoryEntry = { ...e, id: Date.now().toString(36) + Math.random().toString(36).slice(2, 6), time: Date.now() };
     // evitar duplicados consecutivos

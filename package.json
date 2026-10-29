@@ -2,7 +2,7 @@
   "name": "hbd",
   "displayName": "hBD - Cliente de Bases de Datos",
   "description": "Cliente universal de bases de datos para VS Code inspirado en DBeaver: PostgreSQL, MySQL, MariaDB, SQL Server y SQLite. Explorador, editor SQL, grilla editable, ER, import/export, historial y túneles SSH.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "publisher": "HernanHerrera",
   "license": "GPL-3.0-only",
   "repository": {
@@ -70,7 +70,7 @@
     "viewsWelcome": [
       {
         "view": "hbd.connections",
-        "contents": "No hay conexiones configuradas.\n[Nueva conexión](command:hbd.addConnection)\n[Importar conexiones](command:hbd.importConnections)"
+        "contents": "No hay conexiones configuradas.\n[Nueva conexión](command:hbd.addConnection)\n[Importar desde DBeaver](command:hbd.importDbeaver)\n[Importar desde archivo](command:hbd.importConnections)"
       }
     ],
     "commands": [
@@ -86,7 +86,8 @@
       { "command": "hbd.filterObjects", "title": "Filtrar objetos...", "category": "hBD", "icon": "$(filter)" },
       { "command": "hbd.searchObjects", "title": "Buscar objetos en la base de datos...", "category": "hBD", "icon": "$(search)" },
       { "command": "hbd.exportConnections", "title": "Exportar conexiones...", "category": "hBD" },
-      { "command": "hbd.importConnections", "title": "Importar conexiones...", "category": "hBD" },
+      { "command": "hbd.importConnections", "title": "Importar conexiones (hBD o DBeaver)...", "category": "hBD" },
+      { "command": "hbd.importDbeaver", "title": "Importar conexiones de DBeaver", "category": "hBD" },
       { "command": "hbd.newSqlEditor", "title": "Nuevo editor SQL", "category": "hBD", "icon": "$(file-code)" },
       { "command": "hbd.selectConnection", "title": "Seleccionar conexión activa del editor", "category": "hBD", "icon": "$(database)" },
       { "command": "hbd.runStatement", "title": "Ejecutar sentencia actual", "category": "hBD", "icon": "$(play)" },
@@ -157,6 +158,7 @@
         { "command": "hbd.searchObjects", "when": "view == hbd.connections", "group": "navigation@3" },
         { "command": "hbd.refreshAll", "when": "view == hbd.connections", "group": "navigation@4" },
         { "command": "hbd.disconnectAll", "when": "view == hbd.connections", "group": "navigation@5" },
+        { "command": "hbd.importDbeaver", "when": "view == hbd.connections", "group": "z_io@0" },
         { "command": "hbd.importConnections", "when": "view == hbd.connections", "group": "z_io@1" },
         { "command": "hbd.exportConnections", "when": "view == hbd.connections", "group": "z_io@2" },
         { "command": "hbd.showLog", "when": "view == hbd.connections", "group": "z_io@3" },
@@ -234,6 +236,16 @@
     "configuration": {
       "title": "hBD",
       "properties": {
+        "hbd.syncConnections": {
+          "type": "boolean",
+          "default": true,
+          "markdownDescription": "Sincronizar la lista de conexiones entre equipos mediante la **Sincronización de configuración** de VS Code. Las contraseñas no se sincronizan (se piden la primera vez en cada equipo) y las rutas de archivos SQLite y claves SSH pueden ajustarse por equipo."
+        },
+        "hbd.history.sync": {
+          "type": "boolean",
+          "default": false,
+          "markdownDescription": "Sincronizar también el historial de consultas entre equipos (requiere la **Sincronización de configuración** de VS Code)."
+        },
         "hbd.maxRows": {
           "type": "number",
           "default": 1000,

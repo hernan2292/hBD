@@ -42,6 +42,8 @@ export interface ConnectionConfig {
   savePassword?: boolean;
   showSystemObjects?: boolean;
   ssh?: SshConfig;
+  /** Identificador de origen al importar (p. ej. id de DBeaver), para no duplicar. */
+  sourceId?: string;
 }
 
 export interface ResultColumn {

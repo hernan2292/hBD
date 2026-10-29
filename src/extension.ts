@@ -1,12 +1,14 @@
 import * as fs from 'fs';
+import * as path from 'path';
 import * as vscode from 'vscode';
-import { ConnectionManager } from './connectionManager';
+import { ConnectionManager, STATE_KEY, syncEnabled } from './connectionManager';
 import { BaseDriver } from './drivers';
 import { ConnectionConfig, DRIVER_LABELS, KIND_LABELS, ObjectRef } from './drivers/types';
 import { MetadataCache, SqlCompletionProvider } from './editor/completion';
 import { errorText, SqlEditorManager } from './editor/sqlEditor';
 import { ConnectionTree, DbNode } from './explorer/tree';
-import { HistoryItem, QueryHistory } from './history';
+import { HISTORY_KEY, HistoryItem, QueryHistory } from './history';
+import { decryptDbeaverCredentials, findDbeaverConfigs, isDbeaverConfig, parseDbeaver } from './importers/dbeaver';
 import { detectDelimiter, parseCsv } from './util/csv';
 import { formatData } from './util/exporter';
 import { normalizeRows } from './util/values';
@@ -34,6 +36,30 @@ export function activate(ctx: vscode.ExtensionContext): void {
     cm.onDidChange(id => { if (id && !cm.isConnected(id)) cache.clear(id); }),
     sqlm.onDidRunDDL(id => { cache.clear(id); tree.refresh(); })
   );
+
+  // Sincronización entre equipos (Sincronización de configuración de VS Code).
+  // Las contraseñas viven en SecretStorage, que nunca se sincroniza.
+  const applySync = () => {
+    const keys: string[] = [];
+    if (syncEnabled()) keys.push(STATE_KEY);
+    if (vscode.workspace.getConfiguration('hbd').get<boolean>('history.sync', false)) keys.push(HISTORY_KEY);
+    ctx.globalState.setKeysForSync(keys);
+  };
+  applySync();
+  const pullSynced = () => {
+    cm.reloadIfChanged().catch(e => log.appendLine(`Error al recargar conexiones: ${errorText(e)}`));
+    history.reload();
+  };
+  ctx.subscriptions.push(
+    vscode.workspace.onDidChangeConfiguration(e => {
+      if (e.affectsConfiguration('hbd.syncConnections') || e.affectsConfiguration('hbd.history.sync')) applySync();
+    }),
+    // VS Code no avisa cuando llega estado sincronizado: se revisa al volver a la ventana y cada minuto
+    vscode.window.onDidChangeWindowState(s => { if (s.focused) pullSynced(); }),
+    treeView.onDidChangeVisibility(v => { if (v.visible) pullSynced(); })
+  );
+  const timer = setInterval(pullSynced, 60_000);
+  ctx.subscriptions.push({ dispose: () => clearInterval(timer) });
 
   const openTable = (connId: string, ref: ObjectRef, tab: TableTab = 'data') =>
     TableEditorPanel.open(ctx.extensionUri, cm, connId, ref, tab, () => cache.clear(connId));
@@ -137,12 +163,88 @@ export function activate(ctx: vscode.ExtensionContext): void {
     await fs.promises.writeFile(target.fsPath, JSON.stringify(list, null, 2), 'utf8');
     vscode.window.showInformationMessage(`hBD: ${list.length} conexión(es) exportadas (sin contraseñas).`);
   });
+  const importFromFile = async (file: string) => {
+    let data: any;
+    try {
+      data = JSON.parse((await fs.promises.readFile(file, 'utf8')).replace(/^﻿/, ''));
+    } catch (e: any) {
+      throw new Error(`No se pudo leer ${path.basename(file)} como JSON: ${e?.message ?? e}`);
+    }
+    if (Array.isArray(data)) {
+      const n = await cm.importConfigs(data as ConnectionConfig[]);
+      vscode.window.showInformationMessage(`hBD: ${n} conexión(es) importadas.`);
+      return;
+    }
+    if (!isDbeaverConfig(data)) {
+      throw new Error('Formato no reconocido. Se admite el JSON exportado por hBD o el data-sources.json de DBeaver.');
+    }
+    // Credenciales de DBeaver (credentials-config.json en la misma carpeta)
+    let creds: Record<string, any> | undefined;
+    const credFile = path.join(path.dirname(file), 'credentials-config.json');
+    if (fs.existsSync(credFile)) {
+      const ans = await vscode.window.showInformationMessage(
+        '¿Importar también los usuarios y contraseñas guardados en DBeaver?',
+        { modal: true, detail: 'Se descifran de credentials-config.json y se guardan en el almacenamiento seguro de VS Code de este equipo (no se sincronizan).' },
+        'Sí, importar credenciales', 'No, solo las conexiones');
+      if (!ans) return;
+      if (ans.startsWith('Sí')) {
+        try {
+          creds = decryptDbeaverCredentials(await fs.promises.readFile(credFile));
+        } catch (e: any) {
+          vscode.window.showWarningMessage(`hBD: no se pudieron descifrar las credenciales de DBeaver (¿contraseña maestra activada?). Se importan solo las conexiones. ${e?.message ?? ''}`);
+        }
+      }
+    }
+    const res = parseDbeaver(data, creds);
+    for (const s of res.skipped) log.appendLine(`Importación DBeaver: se omite "${s.name}": ${s.reason}`);
+    if (!res.items.length) {
+      vscode.window.showWarningMessage(`hBD: no hay conexiones compatibles para importar${res.skipped.length ? ` (${res.skipped.length} omitidas, ver log)` : ''}.`);
+      return;
+    }
+    const picks = await vscode.window.showQuickPick(res.items.map(it => {
+      const c = it.config;
+      const dup = !!c.sourceId && cm.hasSource(c.sourceId);
+      return {
+        label: c.name,
+        description: `${DRIVER_LABELS[c.driver]} · ${c.driver === 'sqlite' ? c.filePath : `${c.host}${c.port ? ':' + c.port : ''}${c.database ? '/' + c.database : ''}`}`,
+        detail: [c.user ? `usuario: ${c.user}` : undefined, it.password !== undefined ? 'con contraseña' : undefined, c.ssh ? 'túnel SSH' : undefined, dup ? 'ya importada antes' : undefined]
+          .filter(Boolean).join(' · ') || undefined,
+        picked: !dup,
+        it
+      };
+    }), { canPickMany: true, placeHolder: `Conexiones de DBeaver a importar (${res.items.length} compatibles${res.skipped.length ? `, ${res.skipped.length} omitidas` : ''})`, matchOnDescription: true });
+    if (!picks?.length) return;
+    const n = await cm.importItems(picks.map(p => p.it));
+    const withPwd = picks.filter(p => p.it.password !== undefined).length;
+    vscode.window.showInformationMessage(
+      `hBD: ${n} conexión(es) importadas desde DBeaver${creds ? `, ${withPwd} con contraseña` : ''}.${res.skipped.length ? ` ${res.skipped.length} omitidas (ver log).` : ''}`,
+      ...(res.skipped.length ? ['Ver log'] : [])).then(c => { if (c) log.show(); });
+  };
+
   reg('hbd.importConnections', async () => {
-    const pick = await vscode.window.showOpenDialog({ filters: { JSON: ['json'] }, canSelectMany: false });
-    if (!pick?.[0]) return;
-    const data = JSON.parse(await fs.promises.readFile(pick[0].fsPath, 'utf8'));
-    const n = await cm.importConfigs(Array.isArray(data) ? data as ConnectionConfig[] : []);
-    vscode.window.showInformationMessage(`hBD: ${n} conexión(es) importadas.`);
+    const dbeaver = findDbeaverConfigs()[0];
+    const pick = await vscode.window.showOpenDialog({
+      filters: { JSON: ['json'] },
+      canSelectMany: false,
+      openLabel: 'Importar',
+      defaultUri: dbeaver ? vscode.Uri.file(path.dirname(dbeaver)) : undefined
+    });
+    if (pick?.[0]) await importFromFile(pick[0].fsPath);
+  });
+  reg('hbd.importDbeaver', async () => {
+    const found = findDbeaverConfigs();
+    if (!found.length) {
+      const c = await vscode.window.showInformationMessage('hBD: no se encontró la configuración de DBeaver en este equipo.', 'Buscar archivo…');
+      if (c) await vscode.commands.executeCommand('hbd.importConnections');
+      return;
+    }
+    let file = found[0];
+    if (found.length > 1) {
+      const p = await vscode.window.showQuickPick(found.map(f => ({ label: path.basename(path.dirname(path.dirname(f))), description: f, f })), { placeHolder: 'Proyecto de DBeaver' });
+      if (!p) return;
+      file = p.f;
+    }
+    await importFromFile(file);
   });
   reg('hbd.showSessions', async (n?: DbNode) => {
     const id = await connIdOf(n);

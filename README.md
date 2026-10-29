@@ -13,6 +13,16 @@ Motores soportados: **PostgreSQL**, **MySQL**, **MariaDB**, **SQL Server** y **S
 - **Carpetas** para agrupar conexiones, **color** por conexión (p. ej. rojo = producción).
 - Conexiones de **solo lectura** (bloquea INSERT/UPDATE/DELETE/DDL).
 - Duplicar, editar, eliminar, **exportar/importar** conexiones (JSON, sin contraseñas).
+- **Importar desde DBeaver**: lee `data-sources.json` (lo busca solo en la carpeta de DBeaver) y, si lo autoriza, también los usuarios y contraseñas de `credentials-config.json`. Respeta carpetas, solo lectura, túneles SSH y marca en rojo las conexiones de tipo producción. Permite elegir qué conexiones importar y no duplica las ya importadas.
+- **Las mismas conexiones en todos tus equipos** mediante la Sincronización de configuración de VS Code (ver abajo).
+
+### Sincronización entre equipos
+Con la **Sincronización de configuración** de VS Code activada (icono de cuenta → *Activar sincronización de configuración*, con la misma cuenta de GitHub o Microsoft en cada equipo), hBD sincroniza la lista de conexiones automáticamente.
+
+- Las **contraseñas no se sincronizan**: quedan en el almacenamiento seguro de cada equipo y se piden la primera vez que conecta en un equipo nuevo.
+- Si el **archivo SQLite** o la **clave privada SSH** no existen en el equipo, al conectar se ofrece buscarlos; la ruta elegida se guarda solo para ese equipo.
+- El historial de consultas puede sincronizarse activando `hbd.history.sync`.
+- Para desactivarlo: `hbd.syncConnections: false`.
 
 ### Explorador de base de datos
 - Árbol: conexión → bases de datos → esquemas → tablas, vistas, vistas materializadas, funciones, procedimientos, secuencias → columnas, índices, claves foráneas, triggers.
@@ -66,7 +76,7 @@ Motores soportados: **PostgreSQL**, **MySQL**, **MariaDB**, **SQL Server** y **S
 
 ## Configuración
 
-`hbd.maxRows`, `hbd.tableEditor.pageSize`, `hbd.showAllDatabases`, `hbd.script.stopOnError`, `hbd.blankLineDelimiter`, `hbd.history.maxEntries`, `hbd.codeLens.enabled`, `hbd.confirmDangerous`, `hbd.parameters.enabled`, `hbd.format.keywordCase`, `hbd.format.tabWidth`.
+`hbd.syncConnections`, `hbd.history.sync`, `hbd.maxRows`, `hbd.tableEditor.pageSize`, `hbd.showAllDatabases`, `hbd.script.stopOnError`, `hbd.blankLineDelimiter`, `hbd.history.maxEntries`, `hbd.codeLens.enabled`, `hbd.confirmDangerous`, `hbd.parameters.enabled`, `hbd.format.keywordCase`, `hbd.format.tabWidth`.
 
 ## Desarrollo
 
@@ -77,7 +87,7 @@ npm run compile     # o: npm run watch
 
 Pulse **F5** en VS Code (configuración *Ejecutar extensión hBD*) para abrir una ventana con la extensión cargada.
 
-Para generar el instalable: `npm run package` → `hbd-0.1.0.vsix`, e instalarlo con *Extensiones → … → Instalar desde VSIX*.
+Para generar el instalable: `npm run package` → `hbd-<versión>.vsix`, e instalarlo con *Extensiones → … → Instalar desde VSIX*.
 
 ## Limitaciones conocidas
 
